@@ -6,19 +6,21 @@ import wandb
 from transformers import set_seed, TrainingArguments
 from transformers.training_args import OptimizerNames
 
-from pdgpt.utils import print_args
+from pdgpt.utils import print_args, str2bool
+from pdgpt.tokenization import get_tokenizer
 
 
 def setup_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--random_seed', type=int, default=42)
+    parser.add_argument('--wandb_entity', type=str, default='youkenchaw')
 
     parser.add_argument('--output_dir', type=str, default='./output/bloomz')
     parser.add_argument('--log_dir', type=str, default='./log/bloomz')
     parser.add_argument('--cache_dir', type=str, default='./packages')
     parser.add_argument('--data_dir', type=str, default='./data/conversations')
 
-    parser.add_argument('--model_name_or_path', type=str, default='bigscience/bloomz-7b1-mt')
+    parser.add_argument('--model_name', type=str, default='bigscience/bloomz-7b1-mt')
     parser.add_argument('--n_epochs', type=int, default=5)
     parser.add_argument('--train_bsz_per_gpu', type=int, default=3)
     parser.add_argument('--eval_bsz_per_gpu', type=int, default=3)
@@ -28,29 +30,34 @@ def setup_args():
     parser.add_argument('--save_step', type=int, default=100)
     parser.add_argument('--log_step', type=int, default=5)
     parser.add_argument('--weight_decay', type=float, default=0.1)
+    parser.add_argument('--resume_from_checkpoint', type=str2bool, default=False)
 
     args = parser.parse_args()
     return args
 
 
 def pretrain(args):
-    accelerator = Accelerator(mixed_precision='fp16')
+    # accelerator = Accelerator(mixed_precision='fp16')
 
-    if accelerator.is_local_main_process:
-        print_args(args)
+    # if accelerator.is_local_main_process:
+    print_args(args)
 
-        wandb_name = args.model_name.replace(os.getenv("HOME", "/home/ubuntu"), "")
-        wandb.init(
-            project="supervised-finetune",
-            entity=args.wandb_entity,
-            resume=args.resume_from_checkpoint,
-            name=f"{wandb_name}-{args.log_dir}-finetuned",
-            config=args,
-        )
+    # wandb_name = args.model_name.replace(os.getenv("HOME", "/home/ubuntu"), "")
+    # wandb.init(
+    #     project="pdgpt",
+    #     entity=args.wandb_entity,
+    #     resume=args.resume_from_checkpoint,
+    #     name=f"{wandb_name}-finetuned",
+    #     config=args,
+    # )
+
+    optimizer = OptimizerNames.ADAMW_HF
 
     train_conf = TrainingArguments(
         output_dir=args.output_dir
     )
+
+    tokenizer = get_tokenizer(args)
 
     trainer = SFTTrainer(
         model=model,
