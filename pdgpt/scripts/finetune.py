@@ -7,7 +7,8 @@ from transformers import set_seed, TrainingArguments
 from transformers.training_args import OptimizerNames
 
 from pdgpt.utils import print_args, str2bool
-from pdgpt.tokenization import get_tokenizer
+from pdgpt.tokenization import get_tokenizer, tokenizer_sanity_check
+from pdgpt.datasets import DialogueDataCollator
 
 
 def setup_args():
@@ -42,6 +43,49 @@ def pretrain(args):
     # if accelerator.is_local_main_process:
     print_args(args)
 
+    optimizer = OptimizerNames.ADAMW_HF
+
+    train_conf = TrainingArguments(
+        output_dir=args.output_dir
+    )
+
+    tokenizer = get_tokenizer(args)
+
+    # if accelerator.is_local_main_process:
+    tokenizer_sanity_check(tokenizer)
+
+    train_collate_fn = DialogueDataCollator(
+        tokenizer,
+        max_length=args.max_length,
+        random_offset_probability=args.random_offset_probability,
+        label_masking=args.label_masking,
+        samples_mixing=args.samples_mixing,
+        pad_to_multiple_of=16,
+        use_system_prefix=args.use_system_prefix,
+        system_prefix=args.system_prefix,
+        use_system_tag=args.use_system_tag,
+        system_property_dropout=args.system_property_dropout,
+        system_add_length=args.system_add_length,
+    )
+
+    if args.val_max_length is None:
+        args.val_max_length = args.max_length
+
+    eval_collate_fn = DialogueDataCollator(
+        tokenizer,
+        max_length=args.val_max_length,
+        random_offset_probability=args.random_offset_probability,
+        label_masking=args.label_masking,
+        samples_mixing=False,
+        use_system_prefix=args.use_system_prefix,
+        system_prefix=args.system_prefix,
+        use_system_tag=args.use_system_tag,
+        system_property_dropout=args.system_property_dropout,
+        system_add_length=args.system_add_length,
+    )
+
+    train, evals = get_dataset(args)
+
     # wandb_name = args.model_name.replace(os.getenv("HOME", "/home/ubuntu"), "")
     # wandb.init(
     #     project="pdgpt",
@@ -50,14 +94,6 @@ def pretrain(args):
     #     name=f"{wandb_name}-finetuned",
     #     config=args,
     # )
-
-    optimizer = OptimizerNames.ADAMW_HF
-
-    train_conf = TrainingArguments(
-        output_dir=args.output_dir
-    )
-
-    tokenizer = get_tokenizer(args)
 
     trainer = SFTTrainer(
         model=model,
