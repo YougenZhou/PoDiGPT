@@ -1,6 +1,8 @@
 import random
 import copy
 import json
+import jsonlines
+from tqdm import tqdm
 
 from transformers import LlamaTokenizer
 
@@ -71,9 +73,8 @@ def preprocess_pd_generated():
             if '<|Jupiter|>：' in utterances[i]:
                 chat = dict()
                 chat_id += 1
+                chat['Human'] = f'<|Human|>：请扮演一名专业的心理医生与用户开始对话。{eos_token}' if i == 0 else utterances[i - 1] + eos_token
                 chat['Jupiter'] = utterances[i] + eos_token
-                if i + 1 < len(utterances):
-                    chat['Human'] = utterances[i + 1] + eos_token
                 template['chat'][f'turn_{chat_id}'] = chat
 
         template['num_turns'] = chat_id
@@ -135,12 +136,11 @@ def preprocess_d4():
                     utt_str = '<|Jupiter|>: ' + ' '.join(utterances)
 
                     chat_id += 1
-                    chat[f'turn_{chat_id}'] = {'Human': patient_str + eos_token, 'Action': action_str + eos_token,
-                                               'Jupiter': utt_str + eos_token}
+                    chat[f'turn_{chat_id}'] = {'Human': patient_str + eos_token,
+                                               'Jupiter': action_str + '\n' + utt_str + eos_token}
 
             chat[f'turn_{chat_id + 1}'] = {'Human': '<|Human|>: ' + summary_instruction[random.randint(0, 9)] + eos_token,
-                                       'Action': '<|Action|>: Summary' + eos_token,
-                                       'Jupiter': f'<|Jupiter|>: 根据本次问诊，目前可能存在的问题如下：{data["record"]["summary"]}'
+                                       'Jupiter': '<|Action|>: Summary\n' + f'<|Jupiter|>: 根据本次问诊，目前可能存在的问题如下：{data["record"]["summary"]}'
                                                   f'请注意，以上只是一个初步的评估和建议。建议您寻求专业心理医生的帮助，以获取个性化的评估和更详细的计划。' + eos_token}
 
             template['num_turns'] = chat_id + 1
@@ -176,10 +176,15 @@ def process_rogers():
 
         chat_id = 0
         chat = dict()
+        utt_str = '<|Human|>：请扮演一名专业的心理医生与用户开始对话。'
         for chat_idx, message in enumerate(grouped_messages):
             speaker = message[0]['role']
             if speaker == '罗杰斯':
                 doctor_str = '<|Jupiter|>: ' + ' '.join(msg['content'] for msg in message)
+
+                chat_id += 1
+                chat[f'turn_{chat_id}'] = {'Human': utt_str + f'{eos_token}', 'Jupiter': doctor_str + f'{eos_token}', }
+
             else:
                 if chat_idx == 0:
                     continue
@@ -187,9 +192,6 @@ def process_rogers():
                 for msg in message:
                     utterances.append(msg['content'])
                 utt_str = '<|Human|>: ' + ' '.join(utterances)
-
-                chat_id += 1
-                chat[f'turn_{chat_id}'] = {'Jupiter': doctor_str + f'{eos_token}', 'Human': utt_str + f'{eos_token}'}
 
         template['num_turns'] = chat_id
         template['conversation_id'] = f'{idx + 1}'
@@ -219,6 +221,8 @@ def process_merge():
     new_sample = []
     for sample in raw_data:
 
+        group = []
+
         chat = sample['chat']
         num_turns = int(sample['num_turns'])
 
@@ -231,14 +235,21 @@ def process_merge():
             cur_turn_ids = []
             cur_turn = chat[f'turn_{i + 1}']
             for key, value in cur_turn.items():
+                tem_turn = []
                 cur_ids = tokenizer.encode(value)
                 assert isinstance(cur_ids, list) and len(cur_ids) > 0
                 cur_turn_ids.extend(cur_ids)
+                group.append(value)
+                tem_turn.append(value)
 
             if len(input_ids + cur_turn_ids) > 2048:
                 # 划动窗口
+                new_sample.append(group)
+
+                group = []
+                # group.extend(tem_turn)
+
                 input_ids.extend(cur_turn_ids)
-                new_sample.append(tokenizer.decode(input_ids).replace(' ⁇  ', ''))
                 input_ids = copy.deepcopy(instruction_ids)
                 cur_turn_ids = []
 
@@ -248,11 +259,59 @@ def process_merge():
             continue
 
         assert 0 < len(input_ids) <= 2048
-        new_sample.append(tokenizer.decode(input_ids).replace(' ⁇  ', ''))
+        new_sample.append(group)
 
     print(len(new_sample))
     save_json(new_sample, '../output_data/pd_split.json')
 
 
+def process_data_for_train():
+    raw_data = read_json('../output_data/pd_split.json')
+
+    data = []
+    for conversation in tqdm(raw_data):
+        line = {
+            "thread": {
+                "text": "",
+                "role": "",
+                "meta": {},
+                "replies": []
+            },
+            "source": 'pd_merge',
+            "meta": {}
+        }
+        node = line['thread']
+
+        for i in range(0, len(conversation), 2):
+            new_thread = {
+                "text": conversation[i][len('<|Human|>：'):-2].strip(),
+                "role": "prompter",
+                "meta": {},
+                "replies": [
+                    {
+                        "text": conversation[i + 1].replace('<|Jupiter|>：', '')[:-2],
+                        "role": "assistant",
+                        "meta": {},
+                        "replies": []
+                    }
+                ]
+            }
+            if isinstance(node, dict):
+                node.update(new_thread)
+                node = node['replies']
+            else:
+                node[0]['replies'].append(new_thread)
+                node = node[0]['replies'][0]['replies']
+
+        data.append(line)
+
+    with jsonlines.open('../output_data/pd_merge.jsonl', 'w') as wf:
+        for line in data:
+            jsonlines.Writer.write(wf, line)
+
+
 if __name__ == '__main__':
-    process_merge()
+    # preprocess_pd_generated()
+    # merge_all_pd_conversations()
+    # process_merge()
+    process_data_for_train()
