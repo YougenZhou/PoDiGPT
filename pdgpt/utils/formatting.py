@@ -7,10 +7,10 @@ from typing import Literal, Optional
 from pydantic import BaseModel, validator
 from pydantic.fields import ModelField
 
-QA_SPECIAL_TOKENS = {
-    "Question": "<|prompter|>",
-    "Answer": "<|assistant|>",
-    "System": "<|system|>",
+SPECIAL_TOKENS = {
+    "Question": "<|Human|>",
+    "Answer": "<|Jupiter|>",
+    "System": "<|System|>",
     "StartPrefix": "<|prefix_begin|>",
     "EndPrefix": "<|prefix_end|>",
 }
@@ -18,7 +18,7 @@ QA_SPECIAL_TOKENS = {
 
 def format_system_prefix(prefix, eos_token):
     return "{}{}{}".format(
-        QA_SPECIAL_TOKENS["System"],
+        SPECIAL_TOKENS["System"],
         prefix,
         eos_token,
     )
@@ -35,8 +35,8 @@ class Mode(str, Enum):
 
 
 class Role(str, Enum):
-    prompter = "prompter"
-    assistant = "assistant"
+    prompter = "Human"
+    assistant = "Jupiter"
 
 
 class Utterance(BaseModel):
@@ -241,11 +241,11 @@ def format_pairs(
 ) -> list[str]:
     assert isinstance(pairs, list)
     conversations = [
-        "{}{}{}".format(QA_SPECIAL_TOKENS["Question" if i % 2 == 0 else "Answer"], pairs[i], eos_token)
+        "{}{}{}".format(SPECIAL_TOKENS["Question" if i % 2 == 0 else "Answer"], pairs[i], eos_token)
         for i in range(len(pairs))
     ]
     if add_initial_reply_token:
-        conversations.append(QA_SPECIAL_TOKENS["Answer"])
+        conversations.append(SPECIAL_TOKENS["Answer"])
     return conversations
 
 

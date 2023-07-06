@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 import transformers
 
-from pdgpt.utils import QA_SPECIAL_TOKENS, create_dataset_entry_qa
+from pdgpt.utils import SPECIAL_TOKENS, format_pairs
 
 
 class SpecialTokens(NamedTuple):
@@ -49,7 +49,10 @@ def match_tokenizer_name(model_name: str) -> TokenizerConfig:
 def get_tokenizer(args):
     tokenizer_name = args.model_name
 
-    tokenizer = transformers.AutoTokenizer.from_pretrained(tokenizer_name, cache_dir=args.cache_dir)
+    if 'llama' in tokenizer_name:
+        tokenizer = transformers.LlamaTokenizer.from_pretrained(tokenizer_name, cache_dir=args.cache_dir)
+    else:
+        tokenizer = transformers.AutoTokenizer.from_pretrained(tokenizer_name, cache_dir=args.cache_dir)
 
     tokenizer_config = match_tokenizer_name(args.model_name)
 
@@ -70,7 +73,7 @@ def get_tokenizer(args):
         else tokenizer.special_tokens_map["additional_special_tokens"]
     )
 
-    additional_special_tokens = list(set(additional_special_tokens + list(QA_SPECIAL_TOKENS.values())))
+    additional_special_tokens = list(set(additional_special_tokens + list(SPECIAL_TOKENS.values())))
 
     tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
 
@@ -78,7 +81,7 @@ def get_tokenizer(args):
 
 
 def tokenizer_sanity_check(tokenizer):
-    print("Tokenizer sanity check:")
+    print('------------- Tokenizer sanity check --------------')
     print(f"Type: {type(tokenizer).__name__}")
 
     print("special_tokens_map:", tokenizer.special_tokens_map)
@@ -86,19 +89,12 @@ def tokenizer_sanity_check(tokenizer):
     print(f"bos_token='{tokenizer.bos_token}', bos_token_id={tokenizer.bos_token_id}")
     print(f"eos_token='{tokenizer.eos_token}', eos_token_id={tokenizer.eos_token_id}")
 
-    ds_entry = create_dataset_entry_qa(
-        mode="sft", questions=["Q1", "Q2"], answers=["A1", "A2"], lang="en", context="ctx"
-    )
-    in_text = ds_entry.get_formatted(
-        tokenizer.eos_token,
-        use_system_tag=True,
-        system_property_dropout=0,
-        system_add_length=True,
-    )
+    in_text = ['Q1', 'A1', 'Q2', 'A2', 'Q3']
+    in_text = format_pairs(in_text, eos_token=tokenizer.eos_token, add_initial_reply_token=True)
     in_text = "".join(in_text)
 
-    prompter_token_id = tokenizer.convert_tokens_to_ids(QA_SPECIAL_TOKENS["Question"])
-    assistant_token_id = tokenizer.convert_tokens_to_ids(QA_SPECIAL_TOKENS["Answer"])
+    prompter_token_id = tokenizer.convert_tokens_to_ids(SPECIAL_TOKENS["Question"])
+    assistant_token_id = tokenizer.convert_tokens_to_ids(SPECIAL_TOKENS["Answer"])
     print(f"{prompter_token_id=}, {assistant_token_id=}")
 
     tr = tokenizer(in_text, max_length=1024, pad_to_max_length=False, truncation=True)
@@ -116,3 +112,4 @@ def tokenizer_sanity_check(tokenizer):
         print(f'{i}: {xs} -> "{decoded}"')
 
     print("message_indices:", message_indices)
+    print('---------- End of tokenizer sanity check ----------')

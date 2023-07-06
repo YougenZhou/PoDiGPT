@@ -64,7 +64,6 @@ def setup_args():
 def pretrain(args):
     if not args.deepspeed or args.local_rank == 0:
         print_args(args)
-        exit()
 
     # needs to happen before model loading in case of stage 3 training
     training_conf = TrainingArguments(

@@ -5,7 +5,7 @@ from typing import Optional, Union
 import numpy as np
 import torch
 from pdgpt.utils import (
-    QA_SPECIAL_TOKENS,
+    SPECIAL_TOKENS,
     DatasetEntryLm,
     DatasetEntrySft,
     format_pairs,
@@ -103,8 +103,8 @@ class DialogueDataCollator:
             #     )
             # )
 
-            prompter_token_id = self.tokenizer.convert_tokens_to_ids(QA_SPECIAL_TOKENS["Question"])
-            assistant_token_id = self.tokenizer.convert_tokens_to_ids(QA_SPECIAL_TOKENS["Answer"])
+            prompter_token_id = self.tokenizer.convert_tokens_to_ids(SPECIAL_TOKENS["Question"])
+            assistant_token_id = self.tokenizer.convert_tokens_to_ids(SPECIAL_TOKENS["Answer"])
             assert prompter_token_id >= 0 and assistant_token_id >= 0
 
             message_indices = []
