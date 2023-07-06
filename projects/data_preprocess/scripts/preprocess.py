@@ -73,7 +73,7 @@ def preprocess_pd_generated():
             if '<|Jupiter|>：' in utterances[i]:
                 chat = dict()
                 chat_id += 1
-                chat['Human'] = f'<|Human|>：请扮演一名专业的心理医生与用户开始对话。{eos_token}' if i == 0 else utterances[i - 1] + eos_token
+                chat['Human'] = f'<|Human|>：医生你好，请为我进行心理诊断{eos_token}' if i == 0 else utterances[i - 1] + eos_token
                 chat['Jupiter'] = utterances[i] + eos_token
                 template['chat'][f'turn_{chat_id}'] = chat
 
@@ -176,7 +176,7 @@ def process_rogers():
 
         chat_id = 0
         chat = dict()
-        utt_str = '<|Human|>：请扮演一名专业的心理医生与用户开始对话。'
+        utt_str = '<|Human|>：医生你好，请为我进行心理诊断' + eos_token
         for chat_idx, message in enumerate(grouped_messages):
             speaker = message[0]['role']
             if speaker == '罗杰斯':

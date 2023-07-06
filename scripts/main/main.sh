@@ -10,8 +10,7 @@ fi
 
 export OMP_NUM_THREADS=1
 export CUDA_LAUNCH_BLOCKING=1
-export CUDA_VISIBLE_DEVICES=1,2,3,4
+export CUDA_VISIBLE_DEVICES=0
 
-#accelerate launch --config_file ${accelerate_config} \
 python  ./pdgpt/scripts/finetune.py \
-  --resume_from_checkpoint ${resume_from_checkpoint}
+  --config ${config}
