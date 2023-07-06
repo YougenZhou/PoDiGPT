@@ -8,7 +8,6 @@ from transformers import LlamaTokenizer
 
 from projects.data_preprocess.utils import read_json, save_json
 
-
 tokenizer = LlamaTokenizer.from_pretrained('decapoda-research/llama-7b-hf', cache_dir='../../../packages')
 
 meta_instruction = "You are an AI assistant whose name is Jupiter.\n- Jupiter is a dialogue psychological diagnosis model that is developed by YouKen. " \
@@ -137,11 +136,12 @@ def preprocess_d4():
 
                     chat_id += 1
                     chat[f'turn_{chat_id}'] = {'Human': patient_str + eos_token,
-                                               'Jupiter': action_str + '\n' + utt_str + eos_token}
+                                               'Jupiter': utt_str + eos_token}
 
-            chat[f'turn_{chat_id + 1}'] = {'Human': '<|Human|>: ' + summary_instruction[random.randint(0, 9)] + eos_token,
-                                       'Jupiter': '<|Action|>: Summary\n' + f'<|Jupiter|>: 根据本次问诊，目前可能存在的问题如下：{data["record"]["summary"]}'
-                                                  f'请注意，以上只是一个初步的评估和建议。建议您寻求专业心理医生的帮助，以获取个性化的评估和更详细的计划。' + eos_token}
+            chat[f'turn_{chat_id + 1}'] = {
+                'Human': '<|Human|>: ' + summary_instruction[random.randint(0, 9)] + eos_token,
+                'Jupiter': f'<|Jupiter|>: 根据本次问诊，目前可能存在的问题如下：{data["record"]["summary"]}'
+                           f'请注意，以上只是一个初步的评估和建议。建议您寻求专业心理医生的帮助，以获取个性化的评估和更详细的计划。' + eos_token}
 
             template['num_turns'] = chat_id + 1
             template['conversation_id'] = f'{idx + 1}'
@@ -203,6 +203,8 @@ def process_rogers():
 
 def merge_all_pd_conversations():
     d4 = read_json('../output_data/pd_d4.json')
+    d4 = random.sample(d4, int(len(d4) * 0.25))
+
     generated = read_json('../output_data/pd_generated.json')
     rogers = read_json('../output_data/pd_rogers.json')
 
@@ -265,6 +267,32 @@ def process_merge():
     save_json(new_sample, '../output_data/pd_split.json')
 
 
+def process_data_for_OpenAssistant():
+    raw_data = read_json('../output_data/pd_split.json')
+    system_prompt = "你是一个人工智能助手，名字叫EduChat。\n- EduChat是一个由华东师范大学开发的对话式语言模型。\nEduChat的工具\n- Web search: Disable.\n- Calculators: Disable.\n对话主题\n- General: Disable.\n- Psychology: Enable.\n- Socrates: Disable."
+    dialogue = []
+
+    for data in tqdm(raw_data):
+        dialog = []
+        for utterance in data:
+            if 'Human' in utterance:
+                utterance = utterance[10:].rstrip('/s')
+            elif 'Jupiter' in utterance:
+                utterance = utterance[12:].rstrip('/s')
+            else:
+                print(utterance)
+                raise ValueError('出错啦出错啦！')
+            dialog.append(utterance.strip())
+        dialogue.append({'data': dialog, 'system_prompt': system_prompt})
+
+    with jsonlines.open('../output_data/pd_zyg_7_06.jsonl', 'w') as wf:
+        for line in dialogue:
+            jsonlines.Writer.write(wf, line)
+        wf.close()
+
+
+
+
 def process_data_for_train():
     raw_data = read_json('../output_data/pd_split.json')
 
@@ -311,7 +339,4 @@ def process_data_for_train():
 
 
 if __name__ == '__main__':
-    # preprocess_pd_generated()
-    # merge_all_pd_conversations()
-    # process_merge()
-    process_data_for_train()
+    process_data_for_OpenAssistant()
