@@ -13,4 +13,4 @@ export CUDA_LAUNCH_BLOCKING=1
 export CUDA_VISIBLE_DEVICES=0
 
 python  ./pdgpt/scripts/finetune.py \
-  --config ${config}
+  --configs ${configs}

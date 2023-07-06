@@ -6,29 +6,65 @@ from torch.utils.data import Subset
 from transformers import set_seed, TrainingArguments
 from transformers.training_args import OptimizerNames
 
-from pdgpt.utils import print_args, str2bool
+from pdgpt.utils import print_args, str2bool, read_yaml
 from pdgpt.tokenization import get_tokenizer, tokenizer_sanity_check
 from pdgpt.datasets import DialogueDataCollator, get_dataset
 
 
 def setup_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, required=True)
+    parser.add_argument('--configs', type=str, nargs="+", required=True)
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--deepspeed", type=str2bool, default=False)
-    parser.add_argument('--random_seed', type=int, default=42)
+    parser.add_argument('--rng_seed', type=int)
     parser.add_argument('--wandb_entity', type=str, default='youkenchaw')
     parser.add_argument("--show_dataset_stats", type=str2bool, default=False)
-    args = parser.parse_args()
+    parser.add_argument("--resume_from_checkpoint", action="store_true", help="Resume from last saved checkpoint")
+    args, remaining = parser.parse_known_args()
 
     conf = {}
-    
-    return args
+    configs = read_yaml('./projects/configs')
+    conf.update(configs['defaults'])
+    try:
+        for name in args.configs:
+            if ',' in name:
+                for n in name.split(','):
+                    conf.update(configs[n])
+            else:
+                conf.update(configs[name])
+    except KeyError as e:
+        print(f'Error: Could not find the config "{e.args[0]}" in config.yaml')
+        exit(1)
+
+    conf["wandb_entity"] = args.wandb_entity
+    conf["local_rank"] = args.local_rank
+    conf["deepspeed"] = args.deepspeed
+    conf["resume_from_checkpoint"] = args.resume_from_checkpoint
+    if args.rng_seed is not None:
+        conf["rng_seed"] = args.rng_seed
+    conf["show_dataset_stats"] = args.show_dataset_stats
+
+    # get the world size in deepspeed
+    if conf["deepspeed"]:
+        conf["world_size"] = int(os.getenv("WORLD_SIZE", default="1"))
+    else:
+        conf["world_size"] = 1
+
+    # Override config from command-line
+    parser = argparse.ArgumentParser()
+    for key, value in conf.items():
+        type_ = type(value) if value is not None else str
+        if type_ == bool:
+            type_ = str2bool
+        parser.add_argument(f"--{key}", type=type_, default=value)
+
+    return parser.parse_args(remaining)
 
 
 def pretrain(args):
     if not args.deepspeed or args.local_rank == 0:
         print_args(args)
+        exit()
 
     # needs to happen before model loading in case of stage 3 training
     training_conf = TrainingArguments(
@@ -193,7 +229,7 @@ def pretrain(args):
 
 def main():
     args = setup_args()
-    set_seed(args.random_seed)
+    set_seed(args.rng_seed)
     pretrain(args)
 
 
