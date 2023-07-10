@@ -131,7 +131,7 @@ def pretrain(args):
         system_add_length=args.system_add_length,
     )
 
-    train, evals = get_dataset(training_conf)
+    train, evals = get_dataset(args)
 
     show_dataset_stats = (args.verbose or args.show_dataset_stats) and (
             not args.deepspeed or args.local_rank == 0
