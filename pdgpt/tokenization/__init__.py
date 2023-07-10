@@ -107,9 +107,9 @@ def tokenizer_sanity_check(tokenizer):
         message_indices.append(i)
 
     print("encoding result:", tr)
-    for i, xs in enumerate(tr.input_ids):
-        decoded = tokenizer.decode(xs)
-        print(f'{i}: {xs} -> "{decoded}"')
+    # for i, xs in enumerate(tr.input_ids):
+    #     decoded = tokenizer.decode(xs)
+    #     print(f'{i}: {xs} -> "{decoded}"')
 
     print("message_indices:", message_indices)
     print('---------- End of tokenizer sanity check ----------')

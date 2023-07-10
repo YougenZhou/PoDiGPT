@@ -6,9 +6,10 @@ from torch.utils.data import Subset
 from transformers import set_seed, TrainingArguments
 from transformers.training_args import OptimizerNames
 
-from pdgpt.utils import print_args, str2bool, read_yaml
+from pdgpt.utils import print_args, str2bool, read_yaml, get_metrics
 from pdgpt.tokenization import get_tokenizer, tokenizer_sanity_check
 from pdgpt.datasets import DialogueDataCollator, get_dataset
+from pdgpt.models import get_model
 
 
 def setup_args():
@@ -181,11 +182,11 @@ def pretrain(args):
     # else:
     #     sampler = None
 
-    metrics, preprocess_fns = get_metrics(training_conf, tokenizer)
+    metrics, preprocess_fns = get_metrics(args, tokenizer)
 
-    model = get_model(training_conf, tokenizer)
+    model = get_model(args, tokenizer)
 
-    if training_conf.peft_model:
+    if args.peft_model:
         print("Using PEFT model")
         model = peft_model(
             model, peft_type=training_conf.peft_type, gradient_checkpointing=training_conf.gradient_checkpointing
