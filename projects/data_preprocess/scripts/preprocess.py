@@ -18,7 +18,7 @@ summary_instruction = ['是否存在心理健康问题和需要关注的事项�
                        '我是否需要注意心理健康问题和相关注意事项？', '是否有心理健康问题需要我留意和关注？', '我的心理健康是否有需要注意的地方？',
                        '是否存在我需要注意的心理健康问题？']
 
-eos_token = '/s'
+eos_token = '</s>'
 
 
 def preprocess_pd_generated():
@@ -72,7 +72,7 @@ def preprocess_pd_generated():
             if '<|Jupiter|>：' in utterances[i]:
                 chat = dict()
                 chat_id += 1
-                chat['Human'] = f'<|Human|>：医生你好，请为我进行心理诊断{eos_token}' if i == 0 else utterances[i - 1] + eos_token
+                chat['Human'] = f'<|Human|>：医生你好{eos_token}' if i == 0 else utterances[i - 1] + eos_token
                 chat['Jupiter'] = utterances[i] + eos_token
                 template['chat'][f'turn_{chat_id}'] = chat
 
@@ -176,7 +176,7 @@ def process_rogers():
 
         chat_id = 0
         chat = dict()
-        utt_str = '<|Human|>：医生你好，请为我进行心理诊断' + eos_token
+        utt_str = '<|Human|>：医生你好' + eos_token
         for chat_idx, message in enumerate(grouped_messages):
             speaker = message[0]['role']
             if speaker == '罗杰斯':
@@ -203,7 +203,7 @@ def process_rogers():
 
 def merge_all_pd_conversations():
     d4 = read_json('../output_data/pd_d4.json')
-    d4 = random.sample(d4, int(len(d4) * 0.25))
+    d4 = random.sample(d4, int(len(d4) * 0.75))
 
     generated = read_json('../output_data/pd_generated.json')
     rogers = read_json('../output_data/pd_rogers.json')
@@ -264,11 +264,11 @@ def process_merge():
         new_sample.append(group)
 
     print(len(new_sample))
-    save_json(new_sample, '../output_data/pd_split.json')
+    save_json(new_sample, '../output_data/psychodiagnosis.json')
 
 
 def process_data_for_OpenAssistant():
-    raw_data = read_json('../output_data/pd_split.json')
+    raw_data = read_json('../output_data/psychodiagnosis.json')
     system_prompt = "你是一个人工智能助手，名字叫EduChat。\n- EduChat是一个由华东师范大学开发的对话式语言模型。\nEduChat的工具\n- Web search: Disable.\n- Calculators: Disable.\n对话主题\n- General: Disable.\n- Psychology: Enable.\n- Socrates: Disable."
     dialogue = []
 
@@ -291,10 +291,8 @@ def process_data_for_OpenAssistant():
         wf.close()
 
 
-
-
 def process_data_for_train():
-    raw_data = read_json('../output_data/pd_split.json')
+    raw_data = read_json('../output_data/psychodiagnosis.json')
 
     data = []
     for conversation in tqdm(raw_data):
@@ -339,4 +337,8 @@ def process_data_for_train():
 
 
 if __name__ == '__main__':
-    process_data_for_OpenAssistant()
+    preprocess_d4()
+    process_rogers()
+    preprocess_pd_generated()
+    merge_all_pd_conversations()
+    process_merge()

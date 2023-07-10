@@ -2,13 +2,14 @@ import copy
 from typing import Optional
 
 from torch.utils.data import ConcatDataset, Dataset, Subset
+from sklearn.model_selection import train_test_split
+import numpy as np
 
+from .psy_dataset import PsyDataset
 from .collator import DialogueDataCollator
 
 PSY_DATASETS = [
-    "d4",
-    "generated",
-    "rogers"
+    "psychodiagnosis"
 ]
 
 
@@ -55,6 +56,16 @@ def get_one_dataset(
         eval = Subset(eval, subset_indices)
 
     return train, eval
+
+
+def train_val_dataset(dataset, val_split=0.2) -> tuple[Dataset, Dataset | None]:
+    if val_split == 0:
+        return dataset, None
+
+    train_idx, val_idx = train_test_split(
+        list(range(len(dataset))), test_size=val_split, random_state=666, shuffle=True
+    )
+    return Subset(dataset, train_idx), Subset(dataset, val_idx)
 
 
 def get_dataset(conf, mode: str = "sft"):

@@ -137,6 +137,7 @@ def pretrain(args):
             not args.deepspeed or args.local_rank == 0
     )
     if show_dataset_stats:
+        print('-------------  Dataset states check  --------------')
         print("Training dataset sizes (before sampling):")
         total = len(train)
         for d in train.datasets:
