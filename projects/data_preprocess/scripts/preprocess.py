@@ -203,7 +203,7 @@ def process_rogers():
 
 def merge_all_pd_conversations():
     d4 = read_json('../output_data/pd_d4.json')
-    d4 = random.sample(d4, int(len(d4) * 0.75))
+    d4 = random.sample(d4, int(len(d4) * 0.25))
 
     generated = read_json('../output_data/pd_generated.json')
     rogers = read_json('../output_data/pd_rogers.json')
@@ -217,7 +217,24 @@ def merge_all_pd_conversations():
     save_json(all_data, '../output_data/pd_merge.json')
 
 
-def process_merge():
+def process_merge_for_open():
+    raw_data = read_json('../output_data/pd_merge.json')
+
+    new_sample = []
+    for sample in raw_data:
+        dialog = []
+        chat = sample['chat']
+        num_turns = int(sample['num_turns'])
+        for i in range(num_turns):
+            cur_turn = chat[f'turn_{i + 1}']
+            for key, value in cur_turn.items():
+                dialog.append(value)
+        new_sample.append(dialog)
+
+    save_json(new_sample, '../output_data/pd_merge_no_split.json')
+
+
+def process_merge_split():
     raw_data = read_json('../output_data/pd_merge.json')
 
     new_sample = []
@@ -268,7 +285,7 @@ def process_merge():
 
 
 def process_data_for_OpenAssistant():
-    raw_data = read_json('../output_data/psychodiagnosis.json')
+    raw_data = read_json('../output_data/pd_merge_no_split.json')
     system_prompt = "你是一个人工智能助手，名字叫EduChat。\n- EduChat是一个由华东师范大学开发的对话式语言模型。\nEduChat的工具\n- Web search: Disable.\n- Calculators: Disable.\n对话主题\n- General: Disable.\n- Psychology: Enable.\n- Socrates: Disable."
     dialogue = []
 
@@ -276,16 +293,16 @@ def process_data_for_OpenAssistant():
         dialog = []
         for utterance in data:
             if 'Human' in utterance:
-                utterance = utterance[10:].rstrip('/s')
+                utterance = utterance[10:].rstrip('</s>')
             elif 'Jupiter' in utterance:
-                utterance = utterance[12:].rstrip('/s')
+                utterance = utterance[12:].rstrip('</s>')
             else:
                 print(utterance)
                 raise ValueError('出错啦出错啦！')
             dialog.append(utterance.strip())
         dialogue.append({'data': dialog, 'system_prompt': system_prompt})
 
-    with jsonlines.open('../output_data/pd_zyg_7_06.jsonl', 'w') as wf:
+    with jsonlines.open('../output_data/pd_zyg_no_split_7_11.jsonl', 'w') as wf:
         for line in dialogue:
             jsonlines.Writer.write(wf, line)
         wf.close()
@@ -337,8 +354,10 @@ def process_data_for_train():
 
 
 if __name__ == '__main__':
-    preprocess_d4()
-    process_rogers()
-    preprocess_pd_generated()
-    merge_all_pd_conversations()
-    process_merge()
+    # preprocess_d4()
+    # process_rogers()
+    # preprocess_pd_generated()
+    # merge_all_pd_conversations()
+    # process_merge()
+    # process_data_for_OpenAssistant()
+    process_data_for_OpenAssistant()

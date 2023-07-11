@@ -1,7 +1,8 @@
 import argparse
 import os
-from tqdm import tqdm
+from functools import partial
 
+from tqdm import tqdm
 from torch.utils.data import Subset
 from transformers import set_seed, TrainingArguments
 from transformers.training_args import OptimizerNames
@@ -9,7 +10,8 @@ from transformers.training_args import OptimizerNames
 from pdgpt.utils import print_args, str2bool, read_yaml, get_metrics
 from pdgpt.tokenization import get_tokenizer, tokenizer_sanity_check
 from pdgpt.datasets import DialogueDataCollator, get_dataset
-from pdgpt.models import get_model
+from pdgpt.models import get_model, peft_model
+from pdgpt.scripts import SFTTrainer, compute_metrics, preprocess_logits_for_metrics
 
 
 def setup_args():
@@ -161,26 +163,26 @@ def pretrain(args):
         print(f"\nTotal eval: {total_eval}")
         print("-" * 80)
 
-    # if args.use_custom_sampler:
-    #     samples_length = None
-    #     if args.sort_by_length:
-    #         samples_length = list(
-    #             map(
-    #                 lambda x: train_collate_fn.process_one(x, return_length=True),
-    #                 tqdm(train, desc="Calculating lengths per sample"),
-    #             )
-    #         )
-    #
-    #     sampler = PerDatasetSampler.build_sampler_from_config(
-    #         training_conf,
-    #         train.datasets,
-    #         rank=training_conf.local_rank,
-    #         world_size=training_conf.world_size,
-    #         samples_length=samples_length,
-    #         verbose=show_dataset_stats,
-    #     )
-    # else:
-    #     sampler = None
+    if args.use_custom_sampler:
+        samples_length = None
+        if args.sort_by_length:
+            samples_length = list(
+                map(
+                    lambda x: train_collate_fn.process_one(x, return_length=True),
+                    tqdm(train, desc="Calculating lengths per sample"),
+                )
+            )
+
+        sampler = PerDatasetSampler.build_sampler_from_config(
+            training_conf,
+            train.datasets,
+            rank=training_conf.local_rank,
+            world_size=training_conf.world_size,
+            samples_length=samples_length,
+            verbose=show_dataset_stats,
+        )
+    else:
+        sampler = None
 
     metrics, preprocess_fns = get_metrics(args, tokenizer)
 
@@ -189,7 +191,7 @@ def pretrain(args):
     if args.peft_model:
         print("Using PEFT model")
         model = peft_model(
-            model, peft_type=training_conf.peft_type, gradient_checkpointing=training_conf.gradient_checkpointing
+            model, peft_type=args.peft_type, gradient_checkpointing=args.gradient_checkpointing
         )
 
     if not args.log_wandb:

@@ -3,6 +3,7 @@ import math
 import torch
 import transformers
 from transformers import LlamaForCausalLM
+from peft import LoraConfig, PeftModel, PrefixTuningConfig, get_peft_model, prepare_model_for_int8_training
 
 from pdgpt.utils import patch_model
 
@@ -100,4 +101,46 @@ def get_model(conf, tokenizer, pad_vocab_size_to_multiple_of=16, check_freeze_la
         residual_dropout_lima=conf.residual_dropout_lima,
     )
 
+    return model
+
+
+def prepare_model_for_gradient_checkpointing(model):
+    r"""
+    Prepares the model for gradient checkpointing if necessary
+    """
+    if not getattr(model, "is_loaded_in_8bit", False):
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        else:
+
+            def make_inputs_require_grad(module, input, output):
+                output.requires_grad_(True)
+
+            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+    return model
+
+
+def peft_model(model, peft_type="lora", int8_training=False, gradient_checkpointing=False):
+    if peft_type == "lora":
+        config = LoraConfig(
+            r=16,
+            lora_alpha=32,
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+            lora_dropout=0.05,
+            bias="none",
+            task_type="CAUSAL_LM",
+        )
+    elif peft_type == "prefix-tuning":
+        config = PrefixTuningConfig(
+            num_virtual_tokens=30, prefix_projection=True, encoder_hidden_size=1024, task_type="CAUSAL_LM"
+        )
+    else:
+        raise ValueError("peft_method config is lora or prefix-tuning")
+    model = get_peft_model(model, config)
+    if int8_training:
+        model = prepare_model_for_int8_training(model)
+
+    if gradient_checkpointing:
+        model = prepare_model_for_gradient_checkpointing(model)
+    model.print_trainable_parameters()
     return model
